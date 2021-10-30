@@ -20,6 +20,8 @@ impl<T> Mutex<T> {
     }
     pub fn with_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
         while self.locked.load(Ordering::Relaxed) != UNLOCKED {}
+        // maybe another thread runs here
+        std::thread::yield_now();
         self.locked.store(LOCKED, Ordering::Relaxed);
         // Safety: we hold the lock, therefore we can create a mutable reference
         let ret = f(unsafe { &mut *self.v.get() });
