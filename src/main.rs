@@ -31,10 +31,10 @@ impl<T> Mutex<T> {
 use std::thread::spawn;
 fn main() {
     let l: &'static _ = Box::leak(Box::new(Mutex::new(0)));
-    let handles: Vec<_> = (0..10)
+    let handles: Vec<_> = (0..100)
         .map(|_| {
             spawn(move || {
-                for _ in 0..100 {
+                for _ in 0..1000 {
                     l.with_lock(|v| {
                         *v += 1;
                     });
@@ -45,5 +45,5 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
-    assert_eq!(l.with_lock(|v| *v), 10 * 100);
+    assert_eq!(l.with_lock(|v| *v), 100 * 1000);
 }
