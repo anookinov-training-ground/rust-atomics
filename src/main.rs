@@ -29,10 +29,11 @@ impl<T> Mutex<T> {
             .is_err()
         {
             // MESI protocol: stay in S when locked
-            while self.locked.load(Ordering::Relaxed) == LOCKED {}
+            while self.locked.load(Ordering::Relaxed) == LOCKED {
+                thread::yield_now();
+            }
+            thread::yield_now();
         }
-        // maybe another thread runs here
-        std::thread::yield_now();
         self.locked.store(LOCKED, Ordering::Relaxed);
         // Safety: we hold the lock, therefore we can create a mutable reference
         let ret = f(unsafe { &mut *self.v.get() });
@@ -41,7 +42,7 @@ impl<T> Mutex<T> {
     }
 }
 
-use std::thread::spawn;
+use std::thread::{self, spawn};
 fn main() {
     let l: &'static _ = Box::leak(Box::new(Mutex::new(0)));
     let handles: Vec<_> = (0..100)
