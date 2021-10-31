@@ -19,18 +19,17 @@ impl<T> Mutex<T> {
         }
     }
     pub fn with_lock<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
+        // x86 (Intel | AMD): CAS (Compare and Swap Operation)
+        // ARM: LDREX (Load Exclusive | Load Linked) STREX (Store Exclusive | Store Conditional)
+        //   - compare_exchange: impl using a loop of LDREX and STREX
+        //   - compare_exchange_weak: LDREX STREX
         while self
             .locked
             .compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Relaxed, Ordering::Relaxed)
             .is_err()
         {
-            // MESI protocol
+            // MESI protocol: stay in S when locked
             while self.locked.load(Ordering::Relaxed) == LOCKED {}
-
-            // x86 (Intel | AMD): CAS (Compare and Swap Operation)
-            // ARM: LDREX (Load Exclusive) STREX (Store Exclusive)
-            //   - compare_exchange: impl using a loop of LDREX and STREX
-            //   - compare_exchange_weak: LDREX STREX
         }
         // maybe another thread runs here
         std::thread::yield_now();
