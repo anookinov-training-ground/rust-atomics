@@ -61,3 +61,27 @@ fn main() {
     }
     assert_eq!(l.with_lock(|v| *v), 100 * 1000);
 }
+
+#[test]
+fn too_relaxed() {
+    use std::sync::atomic::AtomicUsize;
+    let x: &'static _ = Box::leak(Box::new(AtomicUsize::new(0)));
+    let y: &'static _ = Box::leak(Box::new(AtomicUsize::new(0)));
+    let t1 = spawn(move || {
+        let r1 = y.load(Ordering::Relaxed);
+        x.store(r1, Ordering::Relaxed);
+        r1
+    });
+    let t2 = spawn(move || {
+        let r2 = x.load(Ordering::Relaxed);
+        y.store(42, Ordering::Relaxed);
+        r2
+    });
+
+    // MO /* modification order*/ (x): 0 42
+    // MO /* modification order*/ (y): 0 42
+
+    let r1 = t1.join().unwrap();
+    let r2 = t2.join().unwrap();
+    // r1 = r2 == 42
+}
