@@ -25,7 +25,7 @@ impl<T> Mutex<T> {
         //   - compare_exchange_weak: LDREX STREX
         while self
             .locked
-            .compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Relaxed, Ordering::Relaxed)
+            .compare_exchange_weak(UNLOCKED, LOCKED, Ordering::Acquire, Ordering::Relaxed)
             .is_err()
         {
             // MESI protocol: stay in S when locked
@@ -34,10 +34,9 @@ impl<T> Mutex<T> {
             }
             thread::yield_now();
         }
-        self.locked.store(LOCKED, Ordering::Relaxed);
         // Safety: we hold the lock, therefore we can create a mutable reference
         let ret = f(unsafe { &mut *self.v.get() });
-        self.locked.store(UNLOCKED, Ordering::Relaxed);
+        self.locked.store(UNLOCKED, Ordering::Release);
         ret
     }
 }
