@@ -94,20 +94,20 @@ fn main() {
     let z: &'static _ = Box::leak(Box::new(AtomicUsize::new(0)));
 
     let _tx = spawn(move || {
-        x.store(true, Ordering::Release);
+        x.store(true, Ordering::SeqCst);
     });
     let _ty = spawn(move || {
-        y.store(true, Ordering::Release);
+        y.store(true, Ordering::SeqCst);
     });
     let t1 = spawn(move || {
-        while !x.load(Ordering::Acquire) {}
-        if y.load(Ordering::Acquire) {
+        while !x.load(Ordering::SeqCst) {}
+        if y.load(Ordering::SeqCst) {
             z.fetch_add(1, Ordering::Relaxed);
         }
     });
     let t2 = spawn(move || {
-        while !y.load(Ordering::Acquire) {}
-        if x.load(Ordering::Acquire) {
+        while !y.load(Ordering::SeqCst) {}
+        if x.load(Ordering::SeqCst) {
             z.fetch_add(1, Ordering::Relaxed);
         }
     });
