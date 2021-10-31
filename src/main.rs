@@ -42,7 +42,9 @@ impl<T> Mutex<T> {
 }
 
 use std::thread::{self, spawn};
-fn main() {
+
+#[test]
+fn mutex_test() {
     let l: &'static _ = Box::leak(Box::new(Mutex::new(0)));
     let handles: Vec<_> = (0..100)
         .map(|_| {
@@ -83,4 +85,55 @@ fn too_relaxed() {
     let r1 = t1.join().unwrap();
     let r2 = t2.join().unwrap();
     // r1 = r2 == 42
+}
+
+fn main() {
+    use std::sync::atomic::AtomicUsize;
+    let x: &'static _ = Box::leak(Box::new(AtomicBool::new(false)));
+    let y: &'static _ = Box::leak(Box::new(AtomicBool::new(false)));
+    let z: &'static _ = Box::leak(Box::new(AtomicUsize::new(0)));
+
+    let _tx = spawn(move || {
+        x.store(true, Ordering::Release);
+    });
+    let _ty = spawn(move || {
+        y.store(true, Ordering::Release);
+    });
+    let t1 = spawn(move || {
+        while !x.load(Ordering::Acquire) {}
+        if y.load(Ordering::Acquire) {
+            z.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+    let t2 = spawn(move || {
+        while !y.load(Ordering::Acquire) {}
+        if x.load(Ordering::Acquire) {
+            z.fetch_add(1, Ordering::Relaxed);
+        }
+    });
+    t1.join().unwrap();
+    t2.join().unwrap();
+    let z = z.load(Ordering::SeqCst);
+    // What are the possible values for z?
+    //  - Is 0 possible?
+    //    Restrictions:
+    //      we know that t1 must run "after" tx
+    //      we know that t2 must run "after" ty
+    //    Given that..
+    //      ..  tx .. t1 ..
+    //      ty t2 tx t1 -> t1 will increment z
+    //      ty tx ty t2 t1 -> t1 & t2 will increment z
+    //      ty tx ty t1 ty t2 -> t2 will increment z
+    //    Seems impossible to have a thread schedule where z == 0
+    //
+    //             t2  t1, t2
+    //    MO(x): false true
+    //
+    //             t1  t1, t2
+    //    MO(y): false true
+    //
+    //  - Is 1 possible?
+    //    Yes: tx, t1, ty, t2
+    //  - Is 2 possible?
+    //    Yes: tx, ty, t1, t2
 }
